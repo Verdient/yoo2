@@ -90,6 +90,7 @@ class RESTRequest extends \yoo\base\Component
 	public function init(){
 		parent::init();
 		$this->cUrl = Instance::ensure($this->cUrl, CUrl::className());
+		$this->cUrl = $this->cUrl->new();
 	}
 
 	/**
@@ -129,6 +130,23 @@ class RESTRequest extends \yoo\base\Component
 	 */
 	public function addBody($key, $value){
 		$this->_body[$key] = $value;
+		return $this;
+	}
+
+	/**
+	 * addFilterBody(String $key, String $value)
+	 * 过滤后将内容添加到消息体中
+	 * -----------------------------------------
+	 * @param String $key 名称
+	 * @param String $value 内容
+	 * ------------------------
+	 * @return RESTRequest
+	 * @author Verdient。
+	 */
+	public function addFilterBody($key, $value){
+		if(!empty($value)){
+			return $this->addBody($key, $value);
+		}
 		return $this;
 	}
 
@@ -173,6 +191,23 @@ class RESTRequest extends \yoo\base\Component
 	}
 
 	/**
+	 * addFilterQuery(String $key, String $value)
+	 * 过滤后将内容添加到查询参数中
+	 * ------------------------------------------
+	 * @param String $key 名称
+	 * @param String $value 内容
+	 * -------------------------
+	 * @return RESTRequest
+	 * @author Verdient。
+	 */
+	public function addFilterQuery($key, $value){
+		if(!empty($value)){
+			return $this->addQuery($key, $value);
+		}
+		return $this;
+	}
+
+	/**
 	 * setHeader(Array $header)
 	 * 设置消息体
 	 * ------------------------
@@ -209,6 +244,23 @@ class RESTRequest extends \yoo\base\Component
 	 */
 	public function addHeader($key, $value){
 		$this->_header[$key] = $value;
+		return $this;
+	}
+
+	/**
+	 * addFilterHeader(String $key, String $value)
+	 * 过滤后将内容添加到头部信息中
+	 * -------------------------------------------
+	 * @param String $key 名称
+	 * @param String $value 内容
+	 * -------------------------
+	 * @return RESTRequest
+	 * @author Verdient。
+	 */
+	public function addFilterHeader($key, $value){
+		if(!empty($value)){
+			return $this->addHeader($key, $value);
+		}
 		return $this;
 	}
 
@@ -264,17 +316,15 @@ class RESTRequest extends \yoo\base\Component
 	}
 
 	/**
-	 * _prepareResponse(Array $response)
+	 * _prepareResponse()
 	 * 准备响应
-	 * ---------------------------------
-	 * @param Array $response 响应
-	 * ---------------------------
-	 * @return RESTRequest
+	 * ------------------
+	 * @return RESTResponse
 	 * @author Verdient。
 	 */
-	protected function _prepareResponse($response){
+	protected function _prepareResponse(){
 		$responseClass = $this->getResponseClass();
-		return new $responseClass($response);
+		return new $responseClass($this->cUrl);
 	}
 
 	/**
@@ -286,6 +336,8 @@ class RESTRequest extends \yoo\base\Component
 	 */
 	public function send(){
 		$this->_prepareSend();
-		return $this->_prepareResponse($this->cUrl->request($this->method));
+		$this->cUrl->setMethod($this->method);
+		$this->cUrl->prepare();
+		return $this->_prepareResponse($this->cUrl);
 	}
 }

@@ -4,8 +4,7 @@ namespace yoo\filters;
 use Yii;
 use yii\base\InvalidConfigException;
 use yii\di\Instance;
-use yii\web\BadRequestHttpException;
-use yii\web\UnauthorizedHttpException;
+use yoo\helpers\TimeHelper;
 
 /**
  * Signature
@@ -32,12 +31,28 @@ class Signature extends Authentication
 	public $signatureClass;
 
 	/**
-	 * @var $key
+	 * @var String/Callable $key
 	 * 签名秘钥
-	 * ---------
+	 * --------------------------
 	 * @author Verdient。
 	 */
 	public $key;
+
+	/**
+	 * @var String $timestampName
+	 * 时间戳名称
+	 * ---------------------------
+	 * @author Verdient。
+	 */
+	public $timestampName = 'Request-At';
+
+	/**
+	 * @var Integer $duration
+	 * 有效期（毫秒）
+	 * ----------------------
+	 * @author Verdient。
+	 */
+	public $duration = 60000000;
 
 	/**
 	 * init()
@@ -53,23 +68,38 @@ class Signature extends Authentication
 			throw new InvalidConfigException('signatureClass must be set');
 		}
 		$this->signatureClass = Instance::ensure($this->signatureClass);
+		if(!$this->key){
+			throw new InvalidConfigException('key must be set');
+		}
 	}
 
 	/**
-	 * beforeAction()
-	 * 登录
-	 * --------------
+	 * authentication(String $authentication)
+	 * 认证
+	 * --------------------------------------
+	 * @param String $authentication 认证信息
+	 * -------------------------------------
 	 * @return Boolean
 	 * @author Verdient。
 	 */
-	public function beforeAction($action){
-		if(!$authentication = $this->getAuthentication()){
-			throw new BadRequestHttpException($this->name . ' can not be blank');
+	public function authentication($authentication){
+		$timestamp = $this->getParam($this->timestampName);
+		if($timestamp && is_numeric($timestamp)){
+			$diff = abs(TimeHelper::timestamp(true) - $timestamp);
+			if($diff <= $this->duration){
+				if(is_callable($this->key)){
+					$key = call_user_func($this->key);
+				}else{
+					$key = $this->key;
+				}
+				$data = $this->_getSignData();
+				$data .= $timestamp;
+				if($key && $this->signatureClass->validate($data, $authentication, $key)){
+					return true;
+				}
+			}
 		}
-		if($this->signatureClass->validate($this->_getSignData(), $authentication, $this->key)){
-			return true;
-		}
-		throw new UnauthorizedHttpException($this->name . ' is incorrect');
+		return false;
 	}
 
 	/**
@@ -83,6 +113,10 @@ class Signature extends Authentication
 		$request = Yii::$app->getRequest();
 		$post = $request->post();
 		$get = $request->get();
+		unset($post[$this->name]);
+		unset($get[$this->name]);
+		unset($post[$this->timestampName]);
+		unset($post[$this->timestampName]);
 		ksort($post);
 		ksort($get);
 		$data = [

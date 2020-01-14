@@ -39,7 +39,8 @@ class Signature extends \yoo\base\Component
 	public function sign($value, $key = null, $method = null){
 		$key = $key ?: $this->key;
 		$method = strtolower($method ?: $this->method);
-		return hash($method, $value . $key);
+		$result = hash($method, $value . $key);
+		return $result;
 	}
 
 	/**

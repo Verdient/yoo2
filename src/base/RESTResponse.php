@@ -13,6 +13,17 @@ use yoo\components\cUrl\CUrlResponse;
 class RESTResponse extends CUrlResponse
 {
 	/**
+	 * getSuccess()
+	 * 获取是否成功
+	 * ------------
+	 * @return Boolean
+	 * @author Verdient。
+	 */
+	public function getSuccess(){
+		return $this->getProcessSuccess();
+	}
+
+	/**
 	 * getRequestSuccess()
 	 * 获取请求是否成功
 	 * -------------------

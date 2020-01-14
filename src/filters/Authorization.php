@@ -2,7 +2,6 @@
 namespace yoo\filters;
 
 use yii\di\Instance;
-use yii\web\BadRequestHttpException;
 
 /**
  * authorization
@@ -51,14 +50,11 @@ class Authorization extends Authentication
 	 * @author Verdient。
 	 */
 	public function authentication($authentication){
-		if($authentication){
-			$class = $this->user->identityClass;
-			if($identity = $class::findIdentity($authentication)){
-				$this->user->login($identity);
-			}else{
-				throw new BadRequestHttpException($this->message);
-			}
+		$class = $this->user->identityClass;
+		if($identity = $class::findIdentity($authentication)){
+			$this->user->login($identity);
+			return true;
 		}
-		return true;
+		return false;
 	}
 }

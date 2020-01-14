@@ -77,6 +77,7 @@ class RESTComponent extends \yoo\base\Component
 	 * @author Verdient。
 	 */
 	public function init(){
+		parent::init();
 		if(!$this->host){
 			throw new InvalidConfigException('host must be set');
 		}

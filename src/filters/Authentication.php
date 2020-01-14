@@ -2,6 +2,8 @@
 namespace yoo\filters;
 
 use yii\base\InvalidConfigException;
+use yii\web\BadRequestHttpException;
+use yii\web\UnauthorizedHttpException;
 
 /**
  * Authentication
@@ -33,12 +35,20 @@ abstract class Authentication extends \yoo\base\ActionFilter
 	public $source = 'all';
 
 	/**
-	 * @var String $message
-	 * 提示信息
-	 * --------------------
+	 * @var String $blankMessage
+	 * 为空的提示消息
+	 * -------------------------
 	 * @author Verdient。
 	 */
-	public $message = 'The token has expired, Please login again';
+	public $blankMessage = 'The authentication information cannot be empty';
+
+	/**
+	 * @var String $errorMessage
+	 * 错误信息
+	 * -------------------------
+	 * @author Verdient。
+	 */
+	public $errorMessage = 'Authentication failed';
 
 	/**
 	 * @var Array $_enabledSource
@@ -47,6 +57,14 @@ abstract class Authentication extends \yoo\base\ActionFilter
 	 * @author Verdient。
 	 */
 	protected $_enabledSource = ['header', 'query', 'body', 'all'];
+
+	/**
+	 * @var Boolean $strict
+	 * 严格模式
+	 * --------------------
+	 * @author Verdient。
+	 */
+	public $strict = false;
 
 	/**
 	 * init()
@@ -78,9 +96,21 @@ abstract class Authentication extends \yoo\base\ActionFilter
 	 * @author Verdient。
 	 */
 	public function beforeAction($action){
-		return $this->authentication($this->getAuthentication());
+		if($action->id === 'email'){
+			return true;
+		}
+		$authentication = $this->getAuthentication();
+		$result = false;
+		if($authentication){
+			$result = $this->authentication($authentication);
+		}else if($this->strict === true){
+			throw new BadRequestHttpException($this->blankMessage);
+		}
+		if($this->strict === true && !$result){
+			throw new UnauthorizedHttpException($this->errorMessage);
+		}
+		return true;
 	}
-
 
 	/**
 	 * authentication(String $authentication)
@@ -101,17 +131,36 @@ abstract class Authentication extends \yoo\base\ActionFilter
 	 * @author Verdient。
 	 */
 	public function getAuthentication(){
+		return $this->getParam($this->name);
+	}
+
+	/**
+	 * getParam(String $name)
+	 * 获取参数
+	 * ----------------------
+	 * @param String $name 名称
+	 * ------------------------
+	 * @return String
+	 * @author Verdient。
+	 */
+	public function getParam($name){
 		$request = $this->getRequest();
+		$param = null;
 		switch($this->source){
 			case 'all':
 				$headers = $request->getHeaders();
-				return $headers->get($this->name) ?: $request->post($this->name) ?: $request->get($this->name);
+				$param = $headers->get($name) ?: $request->post($name) ?: $request->get($name);
+			break;
 			case 'header':
-				return $headers->get($this->name);
+				$param = $headers->get($name);
+			break;
 			case 'query':
-				return $request->post($this->name);
+				$param = $request->post($name);
+			break;
 			case 'body':
-				return $request->get($this->name);
+				$param = $request->get($name);
+			break;
 		}
+		return $param;
 	}
 }

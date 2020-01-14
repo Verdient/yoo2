@@ -1,10 +1,9 @@
 <?php
 namespace yoo\components\cUrl;
 
-use Yii;
+use yii\base\InvalidConfigException;
 use yii\base\InvalidParamException;
-use yii\helpers\Json;
-use yoo\base\FormData;
+use yoo\components\cUrl\builder\Builder;
 
 /**
  * CUrl
@@ -31,12 +30,23 @@ class CUrl extends \yoo\base\Component
 	public $autoParse = true;
 
 	/**
-	 * @var $_options
-	 * 参数
-	 * --------------
+	 * @var Array $builders
+	 * 构建器
+	 * --------------------
 	 * @author Verdient。
 	 */
-	protected $_options = [];
+	public $builders = [];
+
+	/**
+	 * @var const BUILT_IN_BUILDERS
+	 * 内建构造器
+	 * ----------------------------
+	 * @author Verdient。
+	 */
+	const BUILT_IN_BUILDERS = [
+		'json' => 'yoo\components\cUrl\builder\JsonBuilder',
+		'urlencoded' => 'yoo\components\cUrl\builder\UrlencodedBuilder'
+	];
 
 	/**
 	 * @var $_curl
@@ -47,6 +57,14 @@ class CUrl extends \yoo\base\Component
 	protected $_curl = null;
 
 	/**
+	 * @var Array $_options
+	 * 参数
+	 * --------------------
+	 * @author Verdient。
+	 */
+	protected $_options = [];
+
+	/**
 	 * @var $_defaultOptions
 	 * 默认参数
 	 * ---------------------
@@ -54,6 +72,7 @@ class CUrl extends \yoo\base\Component
 	 */
 	protected $_defaultOptions = [
 		CURLOPT_USERAGENT => 'Yii2-CUrl-Agent',
+		CURLOPT_CUSTOMREQUEST => 'GET',
 		CURLOPT_TIMEOUT => 30,
 		CURLOPT_CONNECTTIMEOUT => 30,
 		CURLOPT_RETURNTRANSFER => true,
@@ -61,8 +80,53 @@ class CUrl extends \yoo\base\Component
 		CURLOPT_SSL_VERIFYPEER => false,
 		CURLOPT_SSL_VERIFYHOST => false,
 		CURLOPT_HTTPHEADER => [],
-		self::CURLOPT_QUERY => [],
+		self::CURLOPT_QUERY => []
 	];
+
+	/**
+	 * new()
+	 * 新cURL实例
+	 * ---------
+	 * @author Verdient。
+	 */
+	public function new(){
+		return new static();
+	}
+
+	/**
+	 * init()
+	 * 初始化
+	 * ------
+	 * @inheritdoc
+	 * -----------
+	 * @author Verdient。
+	 */
+	public function init(){
+		parent::init();
+		$this->builders = array_merge($this->builders, static::BUILT_IN_BUILDERS);
+	}
+
+	/**
+	 * getBuilder(Mixed $builder)
+	 * 获取构建器
+	 * --------------------------
+	 * @param Mixed $builder 构建器
+	 * ---------------------------
+	 * @return Builder
+	 * @author Verdient。
+	 */
+	public function getBuilder($builder){
+		$builder = strtolower($builder);
+		$builder = isset($this->builders[$builder]) ? $this->builders[$builder] : null;
+		if($builder){
+			$builder = new $builder;
+			if(!$builder instanceof Builder){
+				throw new InvalidConfigException('builder must instance of ' . Builder::className());
+			}
+			return $builder;
+		}
+		throw new InvalidParamException('Unkrown builder: ' . $builder);
+	}
 
 	/**
 	 * get()
@@ -140,8 +204,7 @@ class CUrl extends \yoo\base\Component
 	 * @author Verdient。
 	 */
 	public function setUrl($url){
-		$this->setOption(CURLOPT_URL, $url);
-		return $this;
+		return $this->setOption(CURLOPT_URL, $url);
 	}
 
 	/**
@@ -159,8 +222,7 @@ class CUrl extends \yoo\base\Component
 			$header[] = $key . ':' . $value;
 		}
 		$header = array_unique($header);
-		$this->setOption(CURLOPT_HTTPHEADER, $header);
-		return $this;
+		return $this->setOption(CURLOPT_HTTPHEADER, $header);
 	}
 
 	/**
@@ -180,8 +242,7 @@ class CUrl extends \yoo\base\Component
 		}
 		$header[] = $key . ':' . $value;
 		$header = array_unique($header);
-		$this->setOption(CURLOPT_HTTPHEADER, $header);
-		return $this;
+		return $this->setOption(CURLOPT_HTTPHEADER, $header);
 	}
 
 	/**
@@ -195,31 +256,23 @@ class CUrl extends \yoo\base\Component
 	 * @author Verdient。
 	 */
 	public function setBody($data, $formatter = null){
-		$this->setOption(CURLOPT_POST, true);
-		if(is_array($data) && is_string($formatter)){
-			switch(strtolower($formatter)){
-				case 'json':
-					$data = Json::encode($data);
-					$this->addHeader('Content-Type', 'application/json');
-					break;
-				case 'urlencoded':
-					$data = http_build_query($data);
-					$this->addHeader('Content-Type', 'application/x-www-form-urlencoded');
-					break;
-				default:
-					throw new InvalidParamException('Unkrown formatter: ' . $formatter);
-			}
-		}else if($data instanceof FormData){
-			$boundary = $data->getBoundary();
-			$data = $data->toString();
-			$this->addHeader('Content-Type', 'multipart/form-data; boundary=' . $boundary);
-		}
 		if(is_callable($formatter)){
 			$data = call_user_func($formatter, $data);
+		}else if(is_array($data) && is_string($formatter)){
+			$builder = $this->getBuilder($formatter);
+			$builder->setElements($data);
+			$data = $builder;
+		}
+		if($data instanceof Builder){
+			foreach($data->headers() as $name => $value){
+				$this->addHeader($name, $value);
+			}
+			$data = $data->toString();
 		}
 		if(!is_string($data)){
 			throw new InvalidParamException('data must be a string');
 		}
+		$this->setOption(CURLOPT_POST, true);
 		$this->setOption(CURLOPT_POSTFIELDS, $data);
 		$this->addHeader('Content-Length', strlen($data));
 		return $this;
@@ -253,8 +306,20 @@ class CUrl extends \yoo\base\Component
 	 * @author Verdient。
 	 */
 	public function setQuery(Array $query){
-		$this->setOption(self::CURLOPT_QUERY, $query);
-		return $this;
+		return $this->setOption(self::CURLOPT_QUERY, $query);
+	}
+
+	/**
+	 * setMethod(String $method)
+	 * 设置请求方法
+	 * -------------------------
+	 * @param String $method 请求方法
+	 * -----------------------------
+	 * @return CUrl
+	 * @author Verdient。
+	 */
+	public function setMethod($method){
+		return $this->setOption(CURLOPT_CUSTOMREQUEST, strtoupper($method));
 	}
 
 	/**
@@ -312,7 +377,7 @@ class CUrl extends \yoo\base\Component
 	 * @author Verdient。
 	 */
 	public function resetOptions(){
-		if (isset($this->_options)) {
+		if(isset($this->_options)) {
 			$this->_options = [];
 		}
 		return $this;
@@ -414,82 +479,78 @@ class CUrl extends \yoo\base\Component
 	}
 
 	/**
-	 * request(String $method)
-	 * 请求
-	 * -----------------------
-	 * @param String $method 请求方式
-	 * -----------------------------
-	 * @return CUrlResponse
+	 * getStatusCode()
+	 * 获取状态码
+	 * ---------------
+	 * @return Integer
 	 * @author Verdient。
 	 */
-	public function request($method){
-		return $this->_httpRequest(mb_strtoupper($method));
+	public function getStatusCode(){
+		return $this->getInfo(CURLINFO_HTTP_CODE);
 	}
 
 	/**
-	 * _httpRequest(String $method)
-	 * http请求
-	 * ----------------------------
+	 * request(String $method[, Boolean $raw = false])
+	 * 请求
+	 * -----------------------------------------------
 	 * @param String $method 请求方式
 	 * -----------------------------
-	 * @return CUrlResponse
+	 * @return CUrlResponse|String
 	 * @author Verdient。
 	 */
-	protected function _httpRequest($method, $responseContentType = null){
+	public function request($method, $raw = false){
+		$this->setMethod($method);
+		$this->prepare();
+		if($raw === true){
+			$response = $this->send();
+			return $response;
+		}else{
+			return new CUrlResponse($this);
+		}
+	}
+
+	/**
+	 * send()
+	 * 发送
+	 * ------
+	 * @return String
+	 * @author Verdient。
+	 */
+	public function send(){
+		return curl_exec($this->_curl);
+	}
+
+	/**
+	 * prepare()
+	 * 准备
+	 * ---------
+	 * @return CUrl
+	 * @author Verdient。
+	 */
+	public function prepare(){
 		$url = $this->getOption(CURLOPT_URL);
-		$this->setOption(CURLOPT_CUSTOMREQUEST, strtoupper($method));
+		$method = $this->getOption(CURLOPT_CUSTOMREQUEST);
 		if($method === 'HEAD'){
 			$this->setOption(CURLOPT_NOBODY, true);
 			$this->unsetOption(CURLOPT_WRITEFUNCTION);
+		}
+		if(!in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH'])){
+			$this->unsetOption(CURLOPT_POSTFIELDS);
+			$this->unsetOption(CURLOPT_POST);
 		}
 		$query = $this->getOption(self::CURLOPT_QUERY);
 		if(!empty($query)){
 			$url = $url . '?' . http_build_query($query);
 		}
 		$this->setOption(CURLOPT_URL, $url);
-		$this->_curl = curl_init();
-		$options = $this->getOptions();
-		$curlOptions = [];
-		foreach($options as $key => $value){
+		$options = [];
+		foreach($this->getOptions() as $key => $value){
 			if(is_numeric($key)){
-				$curlOptions[$key] = $value;
+				$options[$key] = $value;
 			}
 		}
-		curl_setopt_array($this->_curl, $curlOptions);
-		$result = [];
-		$result['autoParse'] = $this->autoParse;
-		$result['raw'] = [];
-		$result['raw']['response'] = curl_exec($this->_curl);
-		$result['raw']['statusCode'] = $this->getInfo(CURLINFO_HTTP_CODE);
-		if($this->getOption(CURLOPT_HEADER)){
-			$headerSize = $this->getInfo(CURLINFO_HEADER_SIZE);
-			$result['raw']['header'] = mb_substr($result['raw']['response'], 0, $headerSize - 4);
-			$result['raw']['content'] = mb_substr($result['raw']['response'], $headerSize);
-		}else{
-			$result['raw']['header'] = null;
-			$result['raw']['content'] = $result['raw']['response'];
-		}
-		$result['cUrl'] = [];
-		$result['cUrl']['info'] = $this->getInfo();
-		$result['cUrl']['version'] = curl_version();
-		if($result['raw']['response'] === false){
-			$result['cUrl']['errorCode'] = $this->getErrorCode();
-			$result['cUrl']['errorType'] = $this->getErrorType($result['cUrl']['errorCode']);
-			$result['cUrl']['errorMessage'] = $this->getErrorMessage();
-			Yii::warning([
-				'code' => $result['cUrl']['errorCode'],
-				'type' => $result['cUrl']['errorMessage'],
-				'message' => $result['cUrl']['errorMessage'],
-				'info' => $this->getInfo(), 'version' => $result['cUrl']['version']
-			], __METHOD__);
-		}
-		Yii::trace([
-			'method' => $method,
-			'options' => $options,
-			'code' => $result['raw']['statusCode'],
-			'response' => $result['raw']['response']
-		], __METHOD__);
-		$this->reset();
-		return new CUrlResponse($result);
+		$this->_curl = curl_init();
+		curl_setopt_array($this->_curl, $options);
+		return $this;
 	}
 }
