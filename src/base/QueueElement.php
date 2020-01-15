@@ -10,6 +10,38 @@ namespace yoo\base;
 class QueueElement extends \yii\base\BaseObject
 {
 	/**
+	 * @var const STATUS_IN_PROGRESS
+	 * 处理中
+	 * -----------------------------
+	 * @author Verdient。
+	 */
+	const STATUS_IN_PROGRESS = 1;
+
+	/**
+	 * @var const STATUS_SUCCEED
+	 * 已成功
+	 * -------------------------
+	 * @author Verdient。
+	 */
+	const STATUS_SUCCEED = 2;
+
+	/**
+	 * @var const STATUS_RETRYING
+	 * 重试中
+	 * --------------------------
+	 * @author Verdient。
+	 */
+	const STATUS_RETRYING = 3;
+
+	/**
+	 * @var const STATUS_FAILED
+	 * 已失败
+	 * ------------------------
+	 * @author Verdient。
+	 */
+	const STATUS_FAILED = 4;
+
+	/**
 	 * @var Object $element
 	 * 元素
 	 * --------------------
@@ -39,7 +71,7 @@ class QueueElement extends \yii\base\BaseObject
 	 * -------------------------
 	 * @author Verdient。
 	 */
-	public $ladderRetry = false;
+	public $ladderRetry = true;
 
 	/**
 	 * @var Integer $maxRetry
@@ -47,15 +79,15 @@ class QueueElement extends \yii\base\BaseObject
 	 * ----------------------
 	 * @author Verdient。
 	 */
-	public $maxRetry = 5;
+	public $maxRetry = 0;
 
 	/**
-	 * @var Boolean $_succeed
-	 * 是否已成功
-	 * ----------------------
+	 * @var Boolean $_status
+	 * 状态
+	 * ---------------------
 	 * @author Verdient。
 	 */
-	protected $_succeed = false;
+	protected $_status = false;
 
 	/**
 	 * @var Integer $_failCount
@@ -77,14 +109,14 @@ class QueueElement extends \yii\base\BaseObject
 	}
 
 	/**
-	 * getSucceed()
+	 * getIsSucceed()
 	 * 获取是否成功
-	 * ------------
+	 * --------------
 	 * @return Boolean
 	 * @author Verdient。
 	 */
-	public function getSucceed(){
-		return $this->_succeed;
+	public function getIsSucceed(){
+		return $this->_status === static::STATUS_SUCCEED;
 	}
 
 	/**
@@ -95,7 +127,7 @@ class QueueElement extends \yii\base\BaseObject
 	 * @author Verdient。
 	 */
 	public function can(){
-		return ($this->processAt <= 0 || $this->processAt <= time()) && !$this->getIsFinished();
+		return !$this->getIsFinished() && ($this->processAt <= time());
 	}
 
 	/**
@@ -106,13 +138,19 @@ class QueueElement extends \yii\base\BaseObject
 	 * @author Verdient。
 	 */
 	public function setFailed(){
-		$this->_succeed = false;
-		$this->_failCount++;
-		$delay = $this->retryInterval;
-		if($this->ladderRetry === true){
-			$delay = $delay * $this->_failCount;
+		if(!$this->getIsFinished()){
+			$this->_failCount++;
+			if($this->_failCount > $this->maxRetry){
+				$this->_status = static::STATUS_FAILED;
+			}else{
+				$this->_status = static::STATUS_RETRYING;
+				$delay = $this->retryInterval;
+				if($this->ladderRetry === true){
+					$delay = $delay * $this->_failCount;
+				}
+				$this->processAt = time() + $delay;
+			}
 		}
-		$this->processAt = time() + $delay;
 		return $this;
 	}
 
@@ -124,7 +162,9 @@ class QueueElement extends \yii\base\BaseObject
 	 * @author Verdient。
 	 */
 	public function setSucceed(){
-		$this->_succeed = true;
+		if(!$this->getIsFinished()){
+			$this->_status = static::STATUS_SUCCEED;
+		}
 		return $this;
 	}
 
@@ -136,17 +176,6 @@ class QueueElement extends \yii\base\BaseObject
 	 * @author Verdient。
 	 */
 	public function getIsFinished(){
-		return $this->_succeed === true || $this->getIsTerminated();
-	}
-
-	/**
-	 * getIsTerminated()
-	 * 是否已终结
-	 * -----------------
-	 * @return Boolean
-	 * @author Verdient。
-	 */
-	public function getIsTerminated(){
-		return $this->_failCount > $this->maxRetry;
+		return in_array($this->_status, [static::STATUS_SUCCEED, static::STATUS_FAILED]);
 	}
 }

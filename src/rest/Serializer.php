@@ -270,14 +270,14 @@ class Serializer extends \yii\rest\Serializer
 	 * @author Verdient。
 	 */
 	public function serialize($data){
+		if($data instanceof Response){
+			return $data;
+		}
 		if(is_bool($data)){
 			$data = ['message' => $data ? Yii::t('message', 'Success') : Yii::t('message', 'Error')];
 		}
 		if(is_string($data) || is_numeric($data)){
 			$data = ['message' => Yii::t('message', $data)];
-		}
-		if($data instanceof Response){
-			$data = $data->stream ?: ($data->data ?: $data->content);
 		}
 		$isException = ExceptionHelper::isException($data);
 		$result = $isException ? $this->serializeException($data) : parent::serialize($data);

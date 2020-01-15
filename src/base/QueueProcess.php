@@ -54,6 +54,46 @@ class QueueProcess extends \yii\base\BaseObject
 	public $emptySleep = 1;
 
 	/**
+	 * @var Callable $_succeed
+	 * 成功时的回调函数
+	 * ----------------------
+	 * @author Verdient。
+	 */
+	protected $_succeed = null;
+
+	/**
+	 * @var Callable $_failed
+	 * 失败时的回调函数
+	 * ----------------------
+	 * @author Verdient。
+	 */
+	protected $_failed = null;
+
+	/**
+	 * @var Callable $_error
+	 * 出错时的回调函数
+	 * ---------------------
+	 * @author Verdient。
+	 */
+	protected $_error = null;
+
+	/**
+	 * @var Callable $_retry
+	 * 重试时的回调函数
+	 * ---------------------
+	 * @author Verdient。
+	 */
+	protected $_retry = null;
+
+	/**
+	 * @var Callable $_finished
+	 * 结束时的回调函数
+	 * ------------------------
+	 * @author Verdient。
+	 */
+	protected $_finished = null;
+
+	/**
 	 * init()
 	 * 初始化
 	 * ------
@@ -66,6 +106,66 @@ class QueueProcess extends \yii\base\BaseObject
 		$this->queue = Instance::ensure($this->queue);
 		if($this->incessancy === true){
 			set_time_limit(0);
+		}
+	}
+
+	/**
+	 * succeedListener(Callable $callback)
+	 * 成功监听器
+	 * -----------------------------------
+	 * @author Verdient。
+	 */
+	public function succeedListener($callback){
+		if(is_callable($callback)){
+			$this->_succeed = $callback;
+		}
+	}
+
+	/**
+	 * failedListener(Callable $callback)
+	 * 失败监听器
+	 * ----------------------------------
+	 * @author Verdient。
+	 */
+	public function failedListener($callback){
+		if(is_callable($callback)){
+			$this->_failed = $callback;
+		}
+	}
+
+	/**
+	 * errorListener(Callable $callback)
+	 * 错误监听器
+	 * ---------------------------------
+	 * @author Verdient。
+	 */
+	public function errorListener($callback){
+		if(is_callable($callback)){
+			$this->_error = $callback;
+		}
+	}
+
+	/**
+	 * retryListener(Callable $callback)
+	 * 重试监听器
+	 * ---------------------------------
+	 * @author Verdient。
+	 */
+	public function retryListener($callback){
+		if(is_callable($callback)){
+			$this->_retry = $callback;
+		}
+	}
+
+	/**
+	 * finishedListener(Callable $callback)
+	 * 结束监听器
+	 * ------------------------------------
+	 * @author Verdient。
+	 */
+	public function finishedListener($callback){
+		if(is_callable($callback)){
+			$this->_finished = $callback;
 		}
 	}
 
@@ -105,6 +205,48 @@ class QueueProcess extends \yii\base\BaseObject
 	}
 
 	/**
+	 * _setSucceed(QueueElement $queueElement)
+	 * 设置成功
+	 * --------0------------------------------
+	 * @param QueueElement $queueElement 队列元素
+	 * -----------------------------------------
+	 * @author Verdient。
+	 */
+	protected function _setSucceed($queueElement){
+		$queueElement->setSucceed();
+		if(is_callable($this->_succeed)){
+			call_user_func($this->_succeed, $queueElement);
+		}
+		if(is_callable($this->_finished)){
+			call_user_func($this->_finished, true, $queueElement);
+		}
+	}
+
+	/**
+	 * _setFailed(QueueElement $queueElement)
+	 * 设置失败
+	 * --------------------------------------
+	 * @param QueueElement $queueElement 队列元素
+	 * -----------------------------------------
+	 * @author Verdient。
+	 */
+	protected function _setFailed($queueElement){
+		$queueElement->setFailed();
+		if(!$queueElement->getIsFinished()){
+			if(is_callable($this->_retry)){
+				call_user_func($this->_retry, $queueElement);
+			}
+		}else{
+			if(is_callable($this->_failed)){
+				call_user_func($this->_failed, $queueElement);
+			}
+			if(is_callable($this->_finished)){
+				call_user_func($this->_finished, false, $queueElement);
+			}
+		}
+	}
+
+	/**
 	 * _process(Callable $callback)
 	 * 处理
 	 * ----------------------------
@@ -122,16 +264,18 @@ class QueueProcess extends \yii\base\BaseObject
 				if($queueElement->can()){
 					try{
 						if(!call_user_func($callback, $queueElement->element)){
-							$queueElement->setFailed();
+							$this->_setFailed($queueElement);
 						}else{
-							$queueElement->setSucceed();
+							$this->_setSucceed($queueElement);
 						}
 					}catch(\Exception $e){
-						$queueElement->setFailed();
-						Yii::error($e);
+						$this->_setFailed($queueElement);
+						if(is_callable($this->_error)){
+							call_user_func($this->_error, $e, $queueElement);
+						}
 					}
 				}
-				if(!$queueElement->getIsFinished() && !$queueElement->getIsTerminated()){
+				if(!$queueElement->getIsFinished()){
 					$this->push($queueElement);
 				}
 			}else{

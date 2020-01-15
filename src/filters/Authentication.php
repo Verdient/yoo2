@@ -96,9 +96,6 @@ abstract class Authentication extends \yoo\base\ActionFilter
 	 * @author Verdient。
 	 */
 	public function beforeAction($action){
-		if($action->id === 'email'){
-			return true;
-		}
 		$authentication = $this->getAuthentication();
 		$result = false;
 		if($authentication){

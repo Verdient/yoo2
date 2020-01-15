@@ -1,6 +1,8 @@
 <?php
 namespace yoo\db;
 
+use yii\db\Expression;
+
 /**
  * ActiveQuery
  * 动态查询
@@ -61,9 +63,11 @@ class ActiveQuery extends \yii\db\ActiveQuery
 	 * @author Verdient。
 	 */
 	public function createCommand($db = null){
-		$modelClass = $this->modelClass;
 		if($this->_includeDeleted !== true){
-			$this->andWhere(['!=', 'status', $modelClass::STATUS_DELETED]);
+			$modelClass = $this->modelClass;
+			if($modelClass instanceof ActiveRecord){
+				$this->andWhere(['!=', new Expression($modelClass::tableName() . '.`status`'), $modelClass::STATUS_DELETED]);
+			}
 		}
 		return parent::createCommand($db);
 	}

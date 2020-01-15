@@ -42,6 +42,14 @@ class Response extends \yii\web\Response
 	public $autoFormat = true;
 
 	/**
+	 * @var Boolean $_isDownload
+	 * 是否是下载
+	 * -------------------------
+	 * @author Verdient。
+	 */
+	protected $_isDownload = false;
+
+	/**
 	 * @var Array $_acceptContentTypes
 	 * 接受的消息体类型
 	 * -------------------------------
@@ -60,6 +68,23 @@ class Response extends \yii\web\Response
 	public function init(){
 		parent::init();
 		$this->contentTypes = array_merge($this->defaultContentType(), $this->contentTypes);
+	}
+
+	/**
+	 * setDownloadHeaders(String $attachmentName, String $mimeType = null, Boolean $inline = false, Integer $contentLength = null)
+	 * 设置下载头部
+	 * ---------------------------------------------------------------------------------------------------------------------------
+	 * @param String $attachmentName 附件名称
+	 * @param String $mimeType MIME类型
+	 * @param Boolean $inline 是否内联元素
+	 * @param Integer $contentLength 内容长度
+	 * -------------------------------------
+	 * @return Response
+	 * @author Verdient。
+	 */
+	public function setDownloadHeaders($attachmentName, $mimeType = null, $inline = false, $contentLength = null){
+		$this->_isDownload = true;
+		return parent::setDownloadHeaders($attachmentName, $mimeType, $inline, $contentLength);
 	}
 
 	/**
@@ -132,7 +157,7 @@ class Response extends \yii\web\Response
 	 * @author Verdient。
 	 */
 	protected function prepareFormat(){
-		if($this->autoFormat === true){
+		if($this->autoFormat === true && $this->_isDownload === false){
 			if(empty($this->_formats)){
 				foreach($this->getAcceptContentTypes() as $contentType => $params){
 					if($contentType === '*/*'){

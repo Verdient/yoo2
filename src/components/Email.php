@@ -54,7 +54,7 @@ class Email extends \yoo\base\Component
 	public function sendText($receiver, $message, $options = []){
 		$message = $this->mailer->compose(null)->setTo($receiver)->setTextBody($message);
 		foreach(['from', 'subject', 'cc', 'bcc', 'readReceiptTo'] as $name){
-			if(isset($options[$name])){
+			if(isset($options[$name]) && !empty($options[$name])){
 				$method = 'set' . ucfirst($name);
 				$message->$method($options[$name]);
 			}
@@ -68,17 +68,17 @@ class Email extends \yoo\base\Component
 	}
 
 	/**
-	 * sendCaptcha(String $email, String $captcha)
+	 * sendCaptcha(String $receiver, String $captcha)
 	 * 发送验证码
-	 * -------------------------------------------
-	 * @param String $email 电子邮件地址
+	 * ----------------------------------------------
+	 * @param String $receiver 接收者
 	 * @param String $captcha 验证码
-	 * -------------------------------
+	 * ------------------------------
 	 * @return Null|String
 	 * @author Verdient。
 	 */
-	public function sendCaptcha($email, $captcha){
-		$this->sendText($email, Yii::t('message', 'Your captcha {captcha}, which is valid for 5 minutes, please do not leak it to others!', ['captcha' => $captcha]), ['subject' => Yii::t('message', 'Captcha')]);
+	public function sendCaptcha($receiver, $captcha){
+		$this->sendText($receiver, Yii::t('message', 'Your captcha {captcha}, which is valid for 5 minutes, please do not leak it to others!', ['captcha' => $captcha]), ['subject' => Yii::t('message', 'Captcha')]);
 		return null;
 	}
 }
