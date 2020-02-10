@@ -205,7 +205,9 @@ class Response extends \yii\web\Response
 				if(is_array($this->data)){
 					$this->data = VarDumper::dumpAsString($this->data);
 				}
-				$this->content = $this->data;
+				if(!empty($data)){
+					$this->content = $this->data;
+				}
 				$acceptable = true;
 				break;
 			}
