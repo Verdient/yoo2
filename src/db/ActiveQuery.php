@@ -65,9 +65,7 @@ class ActiveQuery extends \yii\db\ActiveQuery
 	public function createCommand($db = null){
 		if($this->_includeDeleted !== true){
 			$modelClass = $this->modelClass;
-			if($modelClass instanceof ActiveRecord){
-				$this->andWhere(['!=', new Expression($modelClass::tableName() . '.`status`'), $modelClass::STATUS_DELETED]);
-			}
+			$this->andWhere(['!=', new Expression($modelClass::tableName() . '.`status`'), $modelClass::STATUS_DELETED]);
 		}
 		return parent::createCommand($db);
 	}
