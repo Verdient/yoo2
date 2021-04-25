@@ -103,26 +103,6 @@ class ActiveRecord extends \yii\db\ActiveRecord
 	}
 
 	/**
-	 * fields()
-	 * 字段设置
-	 * --------
-	 * @inheritdoc
-	 * -----------
-	 * @return Array
-	 * @author Verdient。
-	 */
-	public function fields(){
-		$fields = parent::fields();
-		if(isset($fields['status'])){
-			$fields['status_label'] = 'statusLabel';
-		}
-		if(isset($fields['id'])){
-			$fields['id_label'] = 'idLabel';
-		}
-		return $fields;
-	}
-
-	/**
 	 * getIdLabel()
 	 * 获取编号标签
 	 * ------------
@@ -203,11 +183,11 @@ class ActiveRecord extends \yii\db\ActiveRecord
 						$instance->setScenario($scenario);
 						$instance->load($attributes);
 					}else{
-						throw new InvalidCallException('instance must instanceof ' . static::className());
+						throw new InvalidCallException('instance must instanceof ' . static::class);
 					}
 				}
 			}else{
-				throw new InvalidCallException('instance must instanceof ' . static::className());
+				throw new InvalidCallException('instance must instanceof ' . static::class);
 			}
 		}
 		return $this;
@@ -250,11 +230,11 @@ class ActiveRecord extends \yii\db\ActiveRecord
 					if($instance instanceof static){
 						$instance->save($runValidation, $attributeNames);
 					}else{
-						throw new InvalidCallException('instance must instanceof ' . static::className());
+						throw new InvalidCallException('instance must instanceof ' . static::class);
 					}
 				}
 			}else{
-				throw new InvalidCallException('instance must instanceof ' . static::className());
+				throw new InvalidCallException('instance must instanceof ' . static::class);
 			}
 		}
 		return $this;
@@ -293,7 +273,7 @@ class ActiveRecord extends \yii\db\ActiveRecord
 	 * @param Array|Boolean $updateColumns 更新的字段
 	 * @param Array $params 其他参数
 	 * --------------------------------------------
-	 * @return Integer
+	 * @return int
 	 * @author Verdient。
 	 */
 	public static function upsert($insertColumns, $updateColumns = true, $params = []){
@@ -428,7 +408,7 @@ class ActiveRecord extends \yii\db\ActiveRecord
 	 * @author Verdient。
 	 */
 	public static function find(){
-		return Yii::createObject(ActiveQuery::className(), [get_called_class()]);;
+		return Yii::createObject(ActiveQuery::class, [get_called_class()]);;
 	}
 
 	/**

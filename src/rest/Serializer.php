@@ -4,7 +4,9 @@ namespace yoo\rest;
 use Yii;
 use yii\base\Arrayable;
 use yii\base\InvalidConfigException;
+use yii\base\Model;
 use yii\base\UserException;
+use yii\data\DataProviderInterface;
 use yii\helpers\ArrayHelper;
 use yii\web\BadRequestHttpException;
 use yii\web\HttpException;
@@ -280,7 +282,21 @@ class Serializer extends \yii\rest\Serializer
 			$data = ['message' => Yii::t('message', $data)];
 		}
 		$isException = ExceptionHelper::isException($data);
-		$result = $isException ? $this->serializeException($data) : parent::serialize($data);
+		if($isException){
+			$result = $this->serializeException($data);
+		}else{
+			if ($data instanceof Model && $data->hasErrors()) {
+				$result =  $this->serializeModelErrors($data);
+			} elseif ($data instanceof Arrayable) {
+				$result =  $this->serializeModel($data);
+			} elseif ($data instanceof \JsonSerializable) {
+				$result =  $data->jsonSerialize();
+			} elseif ($data instanceof DataProviderInterface) {
+				$result = $this->serializeDataProvider($data);
+			} else {
+				$result = $data;
+			}
+		}
 		return $this->format($result, $isException);
 	}
 
@@ -295,7 +311,7 @@ class Serializer extends \yii\rest\Serializer
 	 */
 	public function serializeDataProvider($data){
 		if($data->hasErrors()){
-			return static::serializeModelErrors($data);
+			return $this->serializeModelErrors($data);
 		}
 		$this->_addExposeHeaders();
 		return parent::serializeDataProvider($data);
